@@ -49,6 +49,7 @@ export default function SubmitComplaint({ currentUser }) {
   const [cameraFacingMode, setCameraFacingMode] = useState('environment');
   const [cameraLoading, setCameraLoading] = useState(false);
   const [triggerFlash, setTriggerFlash] = useState(false);
+  const [showPreviewLightbox, setShowPreviewLightbox] = useState(false);
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -129,8 +130,8 @@ export default function SubmitComplaint({ currentUser }) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Downscale image to max 800px for storage optimization while keeping aspect ratio
-        const maxDim = 800;
+        // Downscale image to max 640px for safe Firestore fail-safe fallback storage keeping aspect ratio
+        const maxDim = 640;
         let width = img.width;
         let height = img.height;
         
@@ -170,9 +171,9 @@ export default function SubmitComplaint({ currentUser }) {
         ctx.textBaseline = 'middle';
         
         // Scale fonts relative to canvas width
-        const titleSize = Math.max(13, Math.round(width * 0.024));
-        const textSize = Math.max(10, Math.round(width * 0.018));
-        const addressSize = Math.max(9, Math.round(width * 0.016));
+        const titleSize = Math.max(12, Math.round(width * 0.024));
+        const textSize = Math.max(9, Math.round(width * 0.018));
+        const addressSize = Math.max(8, Math.round(width * 0.016));
         
         // Standard formatted date
         const dateStr = new Date().toLocaleString('en-US', {
@@ -221,8 +222,8 @@ export default function SubmitComplaint({ currentUser }) {
         
         wrapText(`Address: ${address}`, 20, height - bannerHeight + (bannerHeight * 0.78), width - 40, addressSize + 4);
         
-        // Export canvas as highly optimized JPEG data URL
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        // Export canvas as highly optimized JPEG data URL to fit within 1MB firestore safely (~20KB)
+        resolve(canvas.toDataURL('image/jpeg', 0.70));
       };
       img.src = imageSrc;
     });
@@ -529,6 +530,28 @@ export default function SubmitComplaint({ currentUser }) {
                       style={{ 
                         position: 'absolute', 
                         top: '5px', 
+                        right: '38px', 
+                        background: 'rgba(79, 70, 229, 0.95)', 
+                        color: 'white', 
+                        borderRadius: '50%', 
+                        width: '28px', 
+                        height: '28px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        cursor: 'pointer',
+                        boxShadow: 'var(--shadow-sm)',
+                        transition: 'transform 0.2s'
+                      }}
+                      onClick={() => setShowPreviewLightbox(true)}
+                      title="Preview Geotag Fullscreen"
+                    >
+                      <i className="fa-solid fa-expand"></i>
+                    </div>
+                    <div 
+                      style={{ 
+                        position: 'absolute', 
+                        top: '5px', 
                         right: '5px', 
                         background: 'rgba(239, 68, 68, 0.9)', 
                         color: 'white', 
@@ -818,6 +841,69 @@ export default function SubmitComplaint({ currentUser }) {
                 <i className="fa-solid fa-ban"></i>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Geotag Fullscreen Preview Lightbox Modal */}
+      {showPreviewLightbox && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 17, 23, 0.96)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem'
+          }}
+          onClick={() => setShowPreviewLightbox(false)}
+        >
+          <button 
+            type="button" 
+            onClick={() => setShowPreviewLightbox(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.15)',
+              border: 'none',
+              color: 'white',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+              zIndex: 100000
+            }}
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+          
+          <div 
+            style={{ 
+              maxWidth: '90%', 
+              maxHeight: '85vh', 
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              background: 'black',
+              border: '2px solid rgba(255,255,255,0.15)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={geotaggedPhoto} 
+              alt="Geotagged verification evidence fullscreen preview" 
+              style={{ display: 'block', maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain' }} 
+            />
           </div>
         </div>
       )}
