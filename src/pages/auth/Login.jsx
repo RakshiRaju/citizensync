@@ -18,8 +18,13 @@ export default function Login({ onLogin }) {
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data();
         
-        onLogin(userData);
-        navigate(`/${userData.role === 'admin' ? 'admin' : userData.role}/dashboard`);
+        const loggedInUser = {
+          uid: userData.uid || userDoc.id,
+          ...userData
+        };
+        
+        onLogin(loggedInUser);
+        navigate(`/${loggedInUser.role === 'admin' ? 'admin' : loggedInUser.role}/dashboard`);
       } else {
         setError('User not found. Try one of the demo logins.');
       }

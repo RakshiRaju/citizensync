@@ -12,10 +12,26 @@ import DepartmentDashboard from './pages/department/DepartmentDashboard';
 import UpdateComplaint from './pages/department/UpdateComplaint';
 
 function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('citizenSyncCurrentUser');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (error) {
+      console.error('Failed to restore saved user:', error);
+      localStorage.removeItem('citizenSyncCurrentUser');
+      return null;
+    }
+  });
 
-  const handleLogin = (user) => setCurrentUser(user);
-  const handleLogout = () => setCurrentUser(null);
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    localStorage.setItem('citizenSyncCurrentUser', JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('citizenSyncCurrentUser');
+  };
 
   return (
     <Router>
@@ -30,8 +46,8 @@ function App() {
           <Route path="/admin/departments" element={currentUser?.role === 'admin' ? <ManageDepartments /> : <Navigate to="/login" />} />
 
           {/* Citizen Routes */}
-          <Route path="/citizen/dashboard" element={currentUser?.role === 'citizen' ? <CitizenDashboard /> : <Navigate to="/login" />} />
-          <Route path="/citizen/submit-complaint" element={currentUser?.role === 'citizen' ? <SubmitComplaint /> : <Navigate to="/login" />} />
+          <Route path="/citizen/dashboard" element={currentUser?.role === 'citizen' ? <CitizenDashboard currentUser={currentUser} /> : <Navigate to="/login" />} />
+          <Route path="/citizen/submit-complaint" element={currentUser?.role === 'citizen' ? <SubmitComplaint currentUser={currentUser} /> : <Navigate to="/login" />} />
 
           {/* Department Routes */}
           <Route path="/department/dashboard" element={currentUser?.role === 'department' ? <DepartmentDashboard currentUser={currentUser} /> : <Navigate to="/login" />} />

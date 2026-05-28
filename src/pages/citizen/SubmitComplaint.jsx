@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { collection, addDoc } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../firebase';
+import { db } from '../../firebase';
 
 // Fix for leaflet default icon issue in React
 import L from 'leaflet';
@@ -40,7 +39,6 @@ export default function SubmitComplaint({ currentUser }) {
   // New Geotag & Photo States
   const [geotaggedPhoto, setGeotaggedPhoto] = useState(null);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
-  const [addressText, setAddressText] = useState('');
   const [photoError, setPhotoError] = useState('');
   
   // Camera Modal States
@@ -98,7 +96,7 @@ export default function SubmitComplaint({ currentUser }) {
   };
 
   // Reverse Geocoding via OSM Nominatim API
-  const reverseGeocode = async (lat, lng) => {
+  async function reverseGeocode(lat, lng) {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
@@ -106,7 +104,6 @@ export default function SubmitComplaint({ currentUser }) {
       if (!response.ok) throw new Error('Network error during geocoding');
       const data = await response.json();
       const addr = data.display_name || `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
-      setAddressText(addr);
       
       // Update form text input automatically if empty or user wants
       const addrInput = document.getElementById('location_address');
@@ -116,10 +113,9 @@ export default function SubmitComplaint({ currentUser }) {
     } catch (error) {
       console.error('Error reverse geocoding:', error);
       const fallbackAddr = `Coordinates: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      setAddressText(fallbackAddr);
       return fallbackAddr;
     }
-  };
+  }
 
   // Canvas Drawing Utility for Watermark Geotag Overlay
   const drawGeotagWatermark = (imageSrc, lat, lng, address) => {
@@ -242,7 +238,10 @@ export default function SubmitComplaint({ currentUser }) {
           activePos = await getGeoLocationPromise();
           setPosition(activePos);
         } catch (gpsError) {
-          throw new Error('Geolocation is required to capture/upload evidence. Please allow location access or select a location on the map.');
+          throw new Error(
+            'Geolocation is required to capture/upload evidence. Please allow location access or select a location on the map.',
+            { cause: gpsError }
+          );
         }
       }
       
@@ -357,7 +356,7 @@ export default function SubmitComplaint({ currentUser }) {
     }
   };
 
-  // Form Submission with Storage Upload & Fail-Safe Fallback
+  // Form Submission with base64 photo stored directly in Firestore
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -374,25 +373,6 @@ export default function SubmitComplaint({ currentUser }) {
       return;
     }
 
-    let finalEvidenceUrl = null;
-
-    if (geotaggedPhoto) {
-      try {
-        // Try uploading to Firebase Storage first
-        const filename = `complaints/evidence_${Date.now()}.jpg`;
-        const storageRef = ref(storage, filename);
-        
-        // Upload the watermarked base64 JPEG
-        await uploadString(storageRef, geotaggedPhoto, 'data_url');
-        finalEvidenceUrl = await getDownloadURL(storageRef);
-        console.log("Firebase storage upload successful:", finalEvidenceUrl);
-      } catch (storageError) {
-        console.warn("Firebase Storage failed (or is not configured). Falling back to direct base64 in Firestore...", storageError);
-        // Fall back to saving base64 string directly in document
-        finalEvidenceUrl = geotaggedPhoto;
-      }
-    }
-    
     const complaintData = {
       title,
       category,
@@ -406,7 +386,8 @@ export default function SubmitComplaint({ currentUser }) {
         lng: position?.lng || null,
         address: address || null
       },
-      evidenceUrl: finalEvidenceUrl, // Geotagged image reference or base64 string
+      evidenceUrl: geotaggedPhoto || null,
+      evidenceStorageType: geotaggedPhoto ? 'base64' : null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

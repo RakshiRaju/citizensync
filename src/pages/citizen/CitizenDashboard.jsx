@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export default function CitizenDashboard({ currentUser }) {
@@ -10,7 +10,11 @@ export default function CitizenDashboard({ currentUser }) {
 
   useEffect(() => {
     const fetchComplaints = async () => {
-      if (!currentUser?.uid) return;
+      if (!currentUser?.uid) {
+        setUserComplaints([]);
+        setLoading(false);
+        return;
+      }
       
       try {
         const q = query(
